@@ -1,165 +1,86 @@
-//////////////////////////////////////////////////////////////////////////////////	 
-//本程序只供学习使用，未经作者许可，不得用于其它任何用途
-//测试硬件：单片机STM32F407ZGT6,正点原子Explorer STM32F4开发板,主频168MHZ，晶振12MHZ
-//QDtech-TFT液晶驱动 for STM32 IO模拟
-//xiao冯@ShenZhen QDtech co.,LTD
-//公司网站:www.qdtft.com
-//淘宝网站：http://qdtech.taobao.com
-//wiki技术网站：http://www.lcdwiki.com
-//我司提供技术支持，任何技术问题欢迎随时交流学习
-//固话(传真) :+86 0755-23594567 
-//手机:15989313508（冯工） 
-//邮箱:lcdwiki01@gmail.com    support@lcdwiki.com    goodtft@163.com 
-//技术支持QQ:3002773612  3002778157
-//技术交流QQ群:324828016
-//创建日期:2018/08/09
-//版本：V1.0
-//版权所有，盗版必究。
-//Copyright(C) 深圳市全动电子技术有限公司 2018-2028
-//All rights reserved
-/****************************************************************************************************
-//=========================================电源接线================================================//
-//     LCD模块                STM32单片机
-//      VCC          接        DC5V/3.3V      //电源
-//      GND          接          GND          //电源地
-//=======================================液晶屏数据线接线==========================================//
-//本模块默认数据总线类型为SPI总线
-//     LCD模块                STM32单片机    
-//    SDI(MOSI)      接          PB5          //液晶屏SPI总线数据写信号
-//    SDO(MISO)      接          PB4          //液晶屏SPI总线数据读信号，如果不需要读，可以不接线
-//=======================================液晶屏控制线接线==========================================//
-//     LCD模块 					      STM32单片机 
-//       LED         接          PB13         //液晶屏背光控制信号，如果不需要控制，接5V或3.3V
-//       SCK         接          PB3          //液晶屏SPI总线时钟信号
-//     LCD_RS        接          PB14         //液晶屏数据/命令控制信号
-//     LCD_RST       接          PB12         //液晶屏复位控制信号
-//     LCD_CS        接          PB15         //液晶屏片选控制信号
-//=========================================触摸屏触接线=========================================//
-//如果模块不带触摸功能或者带有触摸功能，但是不需要触摸功能，则不需要进行触摸屏接线
-//	   LCD模块                STM32单片机 
-//     CTP_INT       接          PB1          //电容触摸屏中断信号
-//     CTP_SDA       接          PF11         //电容触摸屏IIC数据信号
-//     CTP_RST       接          PC5          //电容触摸屏复位信号
-//     CTP_SCL       接          PB0          //电容触摸屏IIC时钟信号
-**************************************************************************************************/	
- /* @attention
-  *
-  * THE PRESENT FIRMWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
-  * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE
-  * TIME. AS A RESULT, QD electronic SHALL NOT BE HELD LIABLE FOR ANY
-  * DIRECT, INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING
-  * FROM THE CONTENT OF SUCH FIRMWARE AND/OR THE USE MADE BY CUSTOMERS OF THE
-  * CODING INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
-**************************************************************************************************/
+/*
+ * @Author: 星必尘Sguan
+ * @Date: 2025-04-27 21:49:12
+ * @LastEditors: 星必尘Sguan|3464647102@qq.com
+ * @LastEditTime: 2025-04-29 21:53:01
+ * @FilePath: \test_SPIscreen\Hardware\ft6336.c
+ * @Description: [已完成]触控屏的I2C读写寄存器的函数
+ * 
+ * Copyright (c) 2025 by $JUST, All Rights Reserved. 
+ */
 #include "ft6336.h"
 #include "touch.h"
-#include "ctpiic.h"
+#include "delay.h" 
 #include "string.h" 
 #include "lcd.h"
-#include "gpio.h"
 
-// extern uint8_t touch_flag;
+extern uint8_t touch_flag;
+extern I2C_HandleTypeDef hi2c1;
 
-/*****************************************************************************
- * @name       :u8 FT5426_WR_Reg(u16 reg,u8 *buf,u8 len)
- * @date       :2020-05-13 
- * @function   :Write data to ft5426 once
- * @parameters :reg:Start register address for written
-								buf:the buffer of data written
-								len:Length of data written
- * @retvalue   :0-Write succeeded 
-								1-Write failed
-******************************************************************************/ 
+#define FT6336_I2C        hi2c1  // 替换为你的I2C句柄
+#define FT6336_ADDR       0x38   // FT6336的I2C地址（7位地址，不含读写位）
+
 uint8_t FT6336_WR_Reg(uint16_t reg,uint8_t *buf,uint8_t len)
 {
-	uint8_t i;
-	uint8_t ret=0;
-	CTP_IIC_Start();	 
-	CTP_IIC_Send_Byte(FT_CMD_WR);	//发送写命令 	 
-	CTP_IIC_Wait_Ack(); 	 										  		   
-	CTP_IIC_Send_Byte(reg&0XFF);   	//发送低8位地址
-	CTP_IIC_Wait_Ack();  
-	for(i=0;i<len;i++)
-	{	   
-		CTP_IIC_Send_Byte(buf[i]);  	//发数据
-		ret=CTP_IIC_Wait_Ack();
-		if(ret)
-		{
-			break;
-		}
-	}
-	CTP_IIC_Stop();					//产生一个停止条件	    
-	return ret; 
-}
+	uint8_t data[len + 1];
+    data[0] = reg & 0xFF;  // 寄存器地址（低8位）
+    memcpy(&data[1], buf, len);  // 写入的数据
 
-/*****************************************************************************
- * @name       :void FT5426_RD_Reg(u16 reg,u8 *buf,u8 len)
- * @date       :2020-05-13 
- * @function   :Read data to ft5426 once
- * @parameters :reg:Start register address for read
-								buf:the buffer of data read
-								len:Length of data read
- * @retvalue   :none
-******************************************************************************/			  
+    // 使用HAL_I2C_Master_Transmit
+    HAL_StatusTypeDef status = HAL_I2C_Master_Transmit(
+        &FT6336_I2C,          // I2C句柄（如hi2c1）
+        FT6336_ADDR << 1,     // 设备地址（左移1位，HAL库自动处理读写位）
+        data,                 // 数据缓冲区（地址+数据）
+        len + 1,              // 数据长度（地址1字节 + 数据len字节）
+        HAL_MAX_DELAY         // 超时时间（可自定义）
+    );
+
+    return (status == HAL_OK) ? 0 : 1;  // 成功返回0，失败返回1
+}
+		  
 void FT6336_RD_Reg(uint16_t reg,uint8_t *buf,uint8_t len)
 {
-	uint8_t i; 
- 	CTP_IIC_Start();	
- 	CTP_IIC_Send_Byte(FT_CMD_WR);   	//发送写命令 	 
-	CTP_IIC_Wait_Ack(); 	 										  		   
- 	CTP_IIC_Send_Byte(reg&0XFF);   	//发送低8位地址
-	CTP_IIC_Wait_Ack();  
- 	CTP_IIC_Start();  	 	   
-	CTP_IIC_Send_Byte(FT_CMD_RD);   	//发送读命令		   
-	CTP_IIC_Wait_Ack();	   
-	for(i=0;i<len;i++)
-	{	   
-    	buf[i]=CTP_IIC_Read_Byte(i==(len-1)?0:1); //发数据	  
-	} 
-	CTP_IIC_Stop();//产生一个停止条件     
+	uint8_t reg_addr = reg & 0xFF;
+	HAL_I2C_Master_Transmit(
+		&FT6336_I2C,
+		FT6336_ADDR << 1,
+		&reg_addr,  // 寄存器地址
+		1,          // 地址长度（1字节）
+		HAL_MAX_DELAY
+	);
+
+	// 再读取数据（读模式）
+	HAL_I2C_Master_Receive(
+		&FT6336_I2C,
+		FT6336_ADDR << 1 | 0x01,  // 读模式（地址 | 0x01）
+		buf,                       // 数据缓冲区
+		len,                       // 读取长度
+		HAL_MAX_DELAY
+	);
 } 
 
-/*****************************************************************************
- * @name       :u8 FT5426_Init(void)
- * @date       :2020-05-13 
- * @function   :Initialize the ft5426 touch screen
- * @parameters :none
- * @retvalue   :0-Initialization successful
-								1-initialization failed
-******************************************************************************/		
 uint8_t FT6336_Init(void)
 {
 	uint8_t temp[2]; 	
-	// GPIO_InitTypeDef  GPIO_InitStructure;
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-	// RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB|RCC_AHB1Periph_GPIOC,ENABLE);//使能GPIOB和GPIOC时钟
+	__HAL_RCC_GPIOB_CLK_ENABLE();
+	__HAL_RCC_GPIOC_CLK_ENABLE();
+
+	GPIO_InitStruct.Pin = CTP_INT_Pin;				 //PB1
+	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;//输入
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;//100MHz
+	GPIO_InitStruct.Pull = GPIO_PULLUP;//上拉 
+	HAL_GPIO_Init(CTP_INT_GPIO_Port, &GPIO_InitStruct);		  
+
+	GPIO_InitStruct.Pin = CTP_RST_Pin;				 //PC5
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP; 	 		//输出	  
+	HAL_GPIO_Init(CTP_RST_GPIO_Port, &GPIO_InitStruct);	
 	
-	// GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;				 //PB1
-	// GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;//输入
-	// GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;//推挽
-	// GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;//100MHz
-	// GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;//上拉 
-	// GPIO_Init(GPIOB, &GPIO_InitStructure);				  
-
-	// GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;				 //PC5
-	// GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT; 	 //输出	  
-	// GPIO_Init(GPIOC, &GPIO_InitStructure);		
-	MX_GPIO_Init();			
-
-	CTP_IIC_Init();      	//初始化电容屏的I2C总线  
-	// FT_RST=0;				//复位
-	HAL_GPIO_WritePin(GPIOC,GPIO_PIN_5,GPIO_PIN_RESET);
-	// delay_ms(10);
-	HAL_Delay(10);
- 	// FT_RST=1;				//释放复位		    
-	HAL_GPIO_WritePin(GPIOC,GPIO_PIN_5,GPIO_PIN_SET);
-	// delay_ms(500);  
-	HAL_Delay(500);	
-//	temp[0]=0;
-//	FT6336_WR_Reg(FT_DEVIDE_MODE,temp,1);	//进入正常操作模式 
-//	FT6336_WR_Reg(FT_ID_G_MODE,temp,1);		//查询模式 
-	//temp[0]=40;								//触摸有效值，22，越小越灵敏	
-	//FT6336_WR_Reg(FT_ID_G_THGROUP,temp,1);	//设置触摸有效值
+	FT_RST=0;				//复位
+	delay_ms(10);
+ 	FT_RST=1;				//释放复位		    
+	delay_ms(500); 
 	FT6336_RD_Reg(FT_ID_G_FOCALTECH_ID,&temp[0],1);
 	if(temp[0]!=0x11)
 	{
@@ -179,29 +100,11 @@ uint8_t FT6336_Init(void)
 	{
 		return 1;
 	}
-//	temp[0]=12;								//激活周期，不能小于12，最大14
-//	FT6336_WR_Reg(FT_ID_G_PERIODACTIVE,temp,1); 
-	//读取版本号，参考值：0x3003
-//	FT6336_RD_Reg(FT_ID_G_LIB_VERSION,&temp[0],2);  
-//	if(temp[0]==0X10&&temp[1]==0X01)//版本:0X3003
-//	{ 
-//		printf("CTP ID:%x\r\n",((u16)temp[0]<<8)+temp[1]);
-//		return 0;
-//	} 
 	return 0;
 }
 
 const uint16_t FT6336_TPX_TBL[2]={FT_TP1_REG,FT_TP2_REG};
 
-/*****************************************************************************
- * @name       :u8 FT5426_Scan(void)
- * @date       :2020-05-13 
- * @function   :Scan touch screen (query mode)
- * @parameters :none
- * @retvalue   :Current touch screen status
-								0-No touch
-								1-With touch
-******************************************************************************/	
 uint8_t FT6336_Scan(void)
 {
 	uint8_t buf[4];
@@ -241,9 +144,7 @@ uint8_t FT6336_Scan(void)
 							tp_dev.y[i]=((uint16_t)(buf[0]&0X0F)<<8)+buf[1];
 							tp_dev.x[i]=lcddev.width-(((uint16_t)(buf[2]&0X0F)<<8)+buf[3]);	
 							break;
-					} 
-					//if((buf[0]&0XF0)!=0X80)tp_dev.x[i]=tp_dev.y[i]=0;//必须是contact事件，才认为有效
-					//printf("x[%d]:%d,y[%d]:%d\r\n",i,tp_dev.x[i],i,tp_dev.y[i]);
+					}
 				}			
 			} 
 			res=1;
@@ -267,40 +168,3 @@ uint8_t FT6336_Scan(void)
 	return res;
 }
  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

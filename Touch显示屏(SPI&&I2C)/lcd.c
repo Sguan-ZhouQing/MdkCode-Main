@@ -1,61 +1,17 @@
-//////////////////////////////////////////////////////////////////////////////////	 
-//本程序只供学习使用，未经作者许可，不得用于其它任何用途
-//测试硬件：单片机STM32F407ZGT6,正点原子Explorer STM32F4开发板,主频168MHZ，晶振12MHZ
-//QDtech-TFT液晶驱动 for STM32 IO模拟
-//xiao冯@ShenZhen QDtech co.,LTD
-//公司网站:www.qdtft.com
-//淘宝网站：http://qdtech.taobao.com
-//wiki技术网站：http://www.lcdwiki.com
-//我司提供技术支持，任何技术问题欢迎随时交流学习
-//固话(传真) :+86 0755-23594567 
-//手机:15989313508（冯工） 
-//邮箱:lcdwiki01@gmail.com    support@lcdwiki.com    goodtft@163.com 
-//技术支持QQ:3002773612  3002778157
-//技术交流QQ群:324828016
-//创建日期:2018/08/09
-//版本：V1.0
-//版权所有，盗版必究。
-//Copyright(C) 深圳市全动电子技术有限公司 2018-2028
-//All rights reserved
-/****************************************************************************************************
-//=========================================电源接线================================================//
-//     LCD模块                STM32单片机
-//      VCC          接        DC5V/3.3V      //电源
-//      GND          接          GND          //电源地
-//=======================================液晶屏数据线接线==========================================//
-//本模块默认数据总线类型为SPI总线
-//     LCD模块                STM32单片机    
-//    SDI(MOSI)      接          PB5          //液晶屏SPI总线数据写信号
-//    SDO(MISO)      接          PB4          //液晶屏SPI总线数据读信号，如果不需要读，可以不接线
-//=======================================液晶屏控制线接线==========================================//
-//     LCD模块 					      STM32单片机 
-//       LED         接          PB13         //液晶屏背光控制信号，如果不需要控制，接5V或3.3V
-//       SCK         接          PB3          //液晶屏SPI总线时钟信号
-//     LCD_RS        接          PB14         //液晶屏数据/命令控制信号
-//     LCD_RST       接          PB12         //液晶屏复位控制信号
-//     LCD_CS        接          PB15         //液晶屏片选控制信号
-//=========================================触摸屏触接线=========================================//
-//如果模块不带触摸功能或者带有触摸功能，但是不需要触摸功能，则不需要进行触摸屏接线
-//	   LCD模块                STM32单片机 
-//     CTP_INT       接          PB1          //电容触摸屏中断信号
-//     CTP_SDA       接          PF11         //电容触摸屏IIC数据信号
-//     CTP_RST       接          PC5          //电容触摸屏复位信号
-//     CTP_SCL       接          PB0          //电容触摸屏IIC时钟信号
-**************************************************************************************************/	
- /* @attention
-  *
-  * THE PRESENT FIRMWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
-  * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE
-  * TIME. AS A RESULT, QD electronic SHALL NOT BE HELD LIABLE FOR ANY
-  * DIRECT, INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING
-  * FROM THE CONTENT OF SUCH FIRMWARE AND/OR THE USE MADE BY CUSTOMERS OF THE
-  * CODING INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
-**************************************************************************************************/	
+/*
+ * @Author: 星必尘Sguan
+ * @Date: 2025-04-27 21:49:28
+ * @LastEditors: 星必尘Sguan|3464647102@qq.com
+ * @LastEditTime: 2025-04-29 21:59:08
+ * @FilePath: \test_SPIscreen\Hardware\lcd.c
+ * @Description: [已完成]LCD屏幕显示的驱动程序
+ * 
+ * Copyright (c) 2025 by $JUST, All Rights Reserved. 
+ */
 #include "lcd.h"
 #include "stdlib.h"
-#include "spi.h"
+#include "delay.h"	 
 #include "mySPI.h"
-#include "gpio.h"
 	   
 //管理LCD重要参数
 //默认为竖屏
@@ -65,134 +21,136 @@ _lcd_dev lcddev;
 uint16_t POINT_COLOR = 0x0000,BACK_COLOR = 0xFFFF;  
 uint16_t DeviceCode;	 
 
-/*****************************************************************************
- * @name       :void LCD_WR_REG(u8 data)
- * @date       :2018-08-09 
- * @function   :Write an 8-bit command to the LCD screen
- * @parameters :data:Command value to be written
- * @retvalue   :None
-******************************************************************************/
+/**
+ * @brief 向LCD写入寄存器命令
+ * @param data 要写入的寄存器命令值
+ */
 void LCD_WR_REG(uint8_t data)
 { 
 	LCD_CS_CLR;     
 	LCD_RS_CLR;	  
-	SPI_WriteByte(&hspi1,data);
+	SPI_WriteByte(SPI1,data);
 	LCD_CS_SET;	
 }
 
-/*****************************************************************************
- * @name       :void LCD_WR_DATA(u8 data)
- * @date       :2018-08-09 
- * @function   :Write an 8-bit data to the LCD screen
- * @parameters :data:data value to be written
- * @retvalue   :None
-******************************************************************************/
+/**
+ * @brief 向LCD写入数据
+ * @param data 要写入的数据值
+ */
 void LCD_WR_DATA(uint8_t data)
 {
 	LCD_CS_CLR;
 	LCD_RS_SET;
-	SPI_WriteByte(&hspi1,data);
+	SPI_WriteByte(SPI1,data);
 	LCD_CS_SET;
 }
 
+/**
+ * @brief 从LCD读取数据
+ * @return 读取到的数据
+ */
 uint8_t LCD_RD_DATA(void)
 {
 	uint8_t data;
 	LCD_CS_CLR;
 	LCD_RS_SET;
-	SPI_SetSpeed(&hspi1,0);
-	data = SPI_WriteByte(&hspi1,0xFF);
-	SPI_SetSpeed(&hspi1,1);
+	SPI_SetSpeed(SPI1,0);
+	data = SPI_WriteByte(SPI1,0xFF);
+	SPI_SetSpeed(SPI1,1);
 	LCD_CS_SET;
 	return data;
 }
 
-/*****************************************************************************
- * @name       :void LCD_WriteReg(u8 LCD_Reg, u16 LCD_RegValue)
- * @date       :2018-08-09 
- * @function   :Write data into registers
- * @parameters :LCD_Reg:Register address
-                LCD_RegValue:Data to be written
- * @retvalue   :None
-******************************************************************************/
+/**
+ * @brief 向指定寄存器写入值
+ * @param LCD_Reg 寄存器地址
+ * @param LCD_RegValue 要写入的寄存器值
+ */
 void LCD_WriteReg(uint8_t LCD_Reg, uint16_t LCD_RegValue)
 {	
 	LCD_WR_REG(LCD_Reg);  
 	LCD_WR_DATA(LCD_RegValue);	    		 
 }	   
 
+/**
+ * @brief 读取指定寄存器的值
+ * @param LCD_Reg 要读取的寄存器地址
+ * @return 读取到的寄存器值
+ */
 uint8_t LCD_ReadReg(uint8_t LCD_Reg)
 {
 	LCD_WR_REG(LCD_Reg);
 	return LCD_RD_DATA();
 }
 
-/*****************************************************************************
- * @name       :void LCD_WriteRAM_Prepare(void)
- * @date       :2018-08-09 
- * @function   :Write GRAM
- * @parameters :None
- * @retvalue   :None
-******************************************************************************/	 
+/**
+ * @brief 准备写入GRAM(显存)
+ */
 void LCD_WriteRAM_Prepare(void)
 {
 	LCD_WR_REG(lcddev.wramcmd);
 }	 
 
-
+/**
+ * @brief 准备读取GRAM(显存)
+ */
 void LCD_ReadRAM_Prepare(void)
 {
 	LCD_WR_REG(lcddev.rramcmd);
 }	 
 
-/*****************************************************************************
- * @name       :void Lcd_WriteData_16Bit(u16 Data)
- * @date       :2018-08-09 
- * @function   :Write an 16-bit command to the LCD screen
- * @parameters :Data:Data to be written
- * @retvalue   :None
-******************************************************************************/	 
+/**
+ * @brief 向LCD写入16位数据
+ * @param Data 要写入的16位数据
+ */
 void Lcd_WriteData_16Bit(uint16_t Data)
 {	
 	LCD_CS_CLR;
 	LCD_RS_SET;
-	SPI_WriteByte(&hspi1,Data>>8);
-	SPI_WriteByte(&hspi1,Data);
+	SPI_WriteByte(SPI1,Data>>8);
+	SPI_WriteByte(SPI1,Data);
 	LCD_CS_SET;
 }
 
+/**
+ * @brief 从LCD读取16位数据
+ * @return 读取到的16位数据
+ */
 uint16_t Lcd_ReadData_16Bit(void)
 {
 	uint16_t r,g;
 	LCD_CS_CLR;
 	LCD_RS_CLR;	  
-	SPI_WriteByte(&hspi1,lcddev.rramcmd);
-	SPI_SetSpeed(&hspi1,0);
+	SPI_WriteByte(SPI1,lcddev.rramcmd);
+	SPI_SetSpeed(SPI1,0);
 	LCD_RS_SET;
-	SPI_WriteByte(&hspi1,0xFF);
-	r = SPI_WriteByte(&hspi1,0xFF);
-	g = SPI_WriteByte(&hspi1,0xFF);
-	SPI_SetSpeed(&hspi1,1);
+	SPI_WriteByte(SPI1,0xFF);
+	r = SPI_WriteByte(SPI1,0xFF);
+	g = SPI_WriteByte(SPI1,0xFF);
+	SPI_SetSpeed(SPI1,1);
 	LCD_CS_SET;
 	r<<=8;
 	r|=g;
 	return r;
 }
 
-/*****************************************************************************
- * @name       :void LCD_DrawPoint(u16 x,u16 y)
- * @date       :2018-08-09 
- * @function   :Write a pixel data at a specified location
- * @parameters :x:the x coordinate of the pixel
-                y:the y coordinate of the pixel
- * @retvalue   :None
-******************************************************************************/	
+/**
+ * @brief 在指定坐标画点
+ * @param x X坐标
+ * @param y Y坐标
+ */
 void LCD_DrawPoint(uint16_t x,uint16_t y)
 {
 	LCD_SetCursor(x,y);//设置光标位置 
 	Lcd_WriteData_16Bit(POINT_COLOR); 
 }
 
+/**
+ * @brief 读取指定坐标点的颜色值
+ * @param x X坐标
+ * @param y Y坐标
+ * @return 该点的颜色值
+ */
 uint16_t LCD_ReadPoint(uint16_t x,uint16_t y)
 {
 	uint16_t color;
@@ -201,13 +159,10 @@ uint16_t LCD_ReadPoint(uint16_t x,uint16_t y)
 	return color;
 }
 
-/*****************************************************************************
- * @name       :void LCD_Clear(u16 Color)
- * @date       :2018-08-09 
- * @function   :Full screen filled LCD screen
- * @parameters :color:Filled color
- * @retvalue   :None
-******************************************************************************/	
+/**
+ * @brief 清屏函数
+ * @param Color 清屏颜色
+ */
 void LCD_Clear(uint16_t Color)
 {
 	unsigned int i,m;  
@@ -218,61 +173,45 @@ void LCD_Clear(uint16_t Color)
 	{
     for(m=0;m<lcddev.width;m++)
     {	
-			SPI_WriteByte(&hspi1,Color>>8);
-			SPI_WriteByte(&hspi1,Color);
+			SPI_WriteByte(SPI1,Color>>8);
+			SPI_WriteByte(SPI1,Color);
 		}
 	}
 	LCD_CS_SET;
 } 
 
-/*****************************************************************************
- * @name       :void LCD_Clear(u16 Color)
- * @date       :2018-08-09 
- * @function   :Initialization LCD screen GPIO
- * @parameters :None
- * @retvalue   :None
-******************************************************************************/	
+/**
+ * @brief LCD GPIO初始化
+ */
 void LCD_GPIOInit(void)
 {
-	// GPIO_InitTypeDef  GPIO_InitStructure;
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
 	      
-	// RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB ,ENABLE);
+	__HAL_RCC_GPIOB_CLK_ENABLE();
 	
-	// GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_12| GPIO_Pin_13|GPIO_Pin_14| GPIO_Pin_15;
-	// GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;//普通输出模式
-	// GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	// GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;   //推挽输出
-	// GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;//上拉
-	// GPIO_Init(GPIOB, &GPIO_InitStructure);
-	MX_GPIO_Init();
-	// LCD_LED=1;  //点亮背光
-	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_13,GPIO_PIN_SET);
+	GPIO_InitStruct.Pin =  LCD_RST_Pin| LED_Pin|LCD_RS_Pin| LCD_CS_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;//普通输出模式
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;//上拉
+	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	LCD_LED=1;  //点亮背光
 }
 
-/*****************************************************************************
- * @name       :void LCD_RESET(void)
- * @date       :2018-08-09 
- * @function   :Reset LCD screen
- * @parameters :None
- * @retvalue   :None
-******************************************************************************/	
+/**
+ * @brief LCD复位函数
+ */
 void LCD_RESET(void)
 {
 	LCD_RST_CLR;
-	// delay_ms(100);	
-	HAL_Delay(100);
+	delay_ms(100);	
 	LCD_RST_SET;
-	// delay_ms(50);
-	HAL_Delay(50);
+	delay_ms(50);
 }
 
-/*****************************************************************************
- * @name       :void LCD_RESET(void)
- * @date       :2018-08-09 
- * @function   :Initialization LCD screen
- * @parameters :None
- * @retvalue   :None
-******************************************************************************/	 	 
+/**
+ * @brief LCD初始化函数
+ * 包含SPI初始化、GPIO初始化、复位和寄存器配置
+ */
 void LCD_Init(void)
 {  
 	SPI1_Init(); //硬件SPI初始化
@@ -281,8 +220,7 @@ void LCD_Init(void)
 //*************3.5 ST7796S IPS初始化**********//	
 	LCD_WR_REG(0x11);     
 
-	// delay_ms(120);                //Delay 120ms
-	HAL_Delay(120);
+	delay_ms(120);                //Delay 120ms
 
 	LCD_WR_REG(0x36);     // Memory Data Access Control MY,MX~~
 	LCD_WR_DATA(0x48);   
@@ -362,25 +300,21 @@ void LCD_Init(void)
 	LCD_WR_REG(0xF0);     
 	LCD_WR_DATA(0x69);  
 
-	// delay_ms(120); 
-	HAL_Delay(120);               
+	delay_ms(120);                
 	LCD_WR_REG(0x21);     
 	LCD_WR_REG(0x29);
 
 	LCD_direction(USE_HORIZONTAL);//设置LCD显示方向 
 	LCD_Clear(WHITE);//清全屏白色
 }
- 
-/*****************************************************************************
- * @name       :void LCD_SetWindows(u16 xStar, u16 yStar,u16 xEnd,u16 yEnd)
- * @date       :2018-08-09 
- * @function   :Setting LCD display window
- * @parameters :xStar:the bebinning x coordinate of the LCD display window
-								yStar:the bebinning y coordinate of the LCD display window
-								xEnd:the endning x coordinate of the LCD display window
-								yEnd:the endning y coordinate of the LCD display window
- * @retvalue   :None
-******************************************************************************/ 
+
+/**
+ * @brief 设置显示窗口区域
+ * @param xStar 起始X坐标
+ * @param yStar 起始Y坐标
+ * @param xEnd 结束X坐标
+ * @param yEnd 结束Y坐标
+ */
 void LCD_SetWindows(uint16_t xStar, uint16_t yStar,uint16_t xEnd,uint16_t yEnd)
 {	
 	LCD_WR_REG(lcddev.setxcmd);	
@@ -398,29 +332,20 @@ void LCD_SetWindows(uint16_t xStar, uint16_t yStar,uint16_t xEnd,uint16_t yEnd)
 	LCD_WriteRAM_Prepare();	//开始写入GRAM			
 }   
 
-/*****************************************************************************
- * @name       :void LCD_SetCursor(u16 Xpos, u16 Ypos)
- * @date       :2018-08-09 
- * @function   :Set coordinate value
- * @parameters :Xpos:the  x coordinate of the pixel
-								Ypos:the  y coordinate of the pixel
- * @retvalue   :None
-******************************************************************************/ 
+/**
+ * @brief 设置光标位置
+ * @param Xpos X坐标
+ * @param Ypos Y坐标
+ */
 void LCD_SetCursor(uint16_t Xpos, uint16_t Ypos)
 {	  	    			
 	LCD_SetWindows(Xpos,Ypos,Xpos,Ypos);	
 } 
 
-/*****************************************************************************
- * @name       :void LCD_direction(u8 direction)
- * @date       :2018-08-09 
- * @function   :Setting the display direction of LCD screen
- * @parameters :direction:0-0 degree
-                          1-90 degree
-													2-180 degree
-													3-270 degree
- * @retvalue   :None
-******************************************************************************/ 
+/**
+ * @brief 设置LCD显示方向
+ * @param direction 方向参数(0-3)
+ */
 void LCD_direction(uint8_t direction)
 { 
 	lcddev.setxcmd=0x2A;
@@ -453,31 +378,34 @@ void LCD_direction(uint8_t direction)
 	}		
 }	 
 
+/**
+ * @brief 读取LCD ID
+ * @return LCD的ID值
+ */
 uint16_t LCD_Read_ID(void)
 {
 	uint8_t i,val[3] = {0};
 	LCD_WR_REG(0xF0);     // Command Set Control
 	LCD_WR_DATA(0xC3);   
-
 	LCD_WR_REG(0xF0);     
 	LCD_WR_DATA(0x96);  
 	LCD_CS_CLR;
 	for(i=1;i<4;i++)
 	{
 		LCD_RS_CLR;	  
-		SPI_WriteByte(&hspi1,0xFB);
+		SPI_WriteByte(SPI1,0xFB);
 		LCD_RS_SET;
-		SPI_WriteByte(&hspi1,0x10+i);
+		SPI_WriteByte(SPI1,0x10+i);
 		LCD_RS_CLR;	  
-		SPI_WriteByte(&hspi1,0xD3);
-		SPI_SetSpeed(&hspi1,0);
+		SPI_WriteByte(SPI1,0xD3);
+		SPI_SetSpeed(SPI1,0);
 		LCD_RS_SET;
-		val[i-1] = SPI_WriteByte(&hspi1,0xFF);
-		SPI_SetSpeed(&hspi1,1);
+		val[i-1] = SPI_WriteByte(SPI1,0xFF);
+		SPI_SetSpeed(SPI1,1);
 		LCD_RS_CLR;	  
-		SPI_WriteByte(&hspi1,0xFB);
+		SPI_WriteByte(SPI1,0xFB);
 		LCD_RS_SET;
-		SPI_WriteByte(&hspi1,0x00);	
+		SPI_WriteByte(SPI1,0x00);	
 	}
 	LCD_CS_SET;
 	LCD_WR_REG(0xF0);     // Command Set Control

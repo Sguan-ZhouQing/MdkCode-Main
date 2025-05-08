@@ -1,125 +1,48 @@
-//////////////////////////////////////////////////////////////////////////////////	 
-//±æ≥Ã–Ú÷ªπ©—ßœ∞ π”√£¨Œ¥æ≠◊˜’ﬂ–Ìø…£¨≤ªµ√”√”⁄∆‰À¸»Œ∫Œ”√Õæ
-//≤‚ ‘”≤º˛£∫µ•∆¨ª˙STM32F407ZGT6,’˝µ„‘≠◊”Explorer STM32F4ø™∑¢∞Â,÷˜∆µ168MHZ£¨æß’Ò12MHZ
-//QDtech-TFT“∫æß«˝∂Ø for STM32 IOƒ£ƒ‚
-//xiao∑Î@ShenZhen QDtech co.,LTD
-//π´ÀæÕ¯’æ:www.qdtft.com
-//Ã‘±¶Õ¯’æ£∫http://qdtech.taobao.com
-//wikiºº ıÕ¯’æ£∫http://www.lcdwiki.com
-//Œ“ÀæÃ·π©ºº ı÷ß≥÷£¨»Œ∫Œºº ıŒ Ã‚ª∂”≠ÀÊ ±Ωª¡˜—ßœ∞
-//πÃª∞(¥´’Ê) :+86 0755-23594567 
-// ÷ª˙:15989313508£®∑Îπ§£© 
-//” œ‰:lcdwiki01@gmail.com    support@lcdwiki.com    goodtft@163.com 
-//ºº ı÷ß≥÷QQ:3002773612  3002778157
-//ºº ıΩª¡˜QQ»∫:324828016
-//¥¥Ω®»’∆⁄:2018/08/09
-//∞Ê±æ£∫V1.0
-//∞Ê»®À˘”–£¨µ¡∞Ê±ÿæø°£
-//Copyright(C) …Ó€⁄ –»´∂ØµÁ◊”ºº ı”–œﬁπ´Àæ 2018-2028
-//All rights reserved
-/****************************************************************************************************
-//=========================================µÁ‘¥Ω”œﬂ================================================//
-//     LCDƒ£øÈ                STM32µ•∆¨ª˙
-//      VCC          Ω”        DC5V/3.3V      //µÁ‘¥
-//      GND          Ω”          GND          //µÁ‘¥µÿ
-//=======================================“∫æß∆¡ ˝æ›œﬂΩ”œﬂ==========================================//
-//±æƒ£øÈƒ¨»œ ˝æ›◊‹œﬂ¿‡–ÕŒ™SPI◊‹œﬂ
-//     LCDƒ£øÈ                STM32µ•∆¨ª˙    
-//    SDI(MOSI)      Ω”          PB5          //“∫æß∆¡SPI◊‹œﬂ ˝æ›–¥–≈∫≈
-//    SDO(MISO)      Ω”          PB4          //“∫æß∆¡SPI◊‹œﬂ ˝æ›∂¡–≈∫≈£¨»Áπ˚≤ª–Ë“™∂¡£¨ø…“‘≤ªΩ”œﬂ
-//=======================================“∫æß∆¡øÿ÷∆œﬂΩ”œﬂ==========================================//
-//     LCDƒ£øÈ 					      STM32µ•∆¨ª˙ 
-//       LED         Ω”          PB13         //“∫æß∆¡±≥π‚øÿ÷∆–≈∫≈£¨»Áπ˚≤ª–Ë“™øÿ÷∆£¨Ω”5VªÚ3.3V
-//       SCK         Ω”          PB3          //“∫æß∆¡SPI◊‹œﬂ ±÷”–≈∫≈
-//     LCD_RS        Ω”          PB14         //“∫æß∆¡ ˝æ›/√¸¡Óøÿ÷∆–≈∫≈
-//     LCD_RST       Ω”          PB12         //“∫æß∆¡∏¥Œªøÿ÷∆–≈∫≈
-//     LCD_CS        Ω”          PB15         //“∫æß∆¡∆¨—°øÿ÷∆–≈∫≈
-//=========================================¥•√˛∆¡¥•Ω”œﬂ=========================================//
-//»Áπ˚ƒ£øÈ≤ª¥¯¥•√˛π¶ƒ‹ªÚ’ﬂ¥¯”–¥•√˛π¶ƒ‹£¨µ´ «≤ª–Ë“™¥•√˛π¶ƒ‹£¨‘Ú≤ª–Ë“™Ω¯––¥•√˛∆¡Ω”œﬂ
-//	   LCDƒ£øÈ                STM32µ•∆¨ª˙ 
-//     CTP_INT       Ω”          PB1          //µÁ»›¥•√˛∆¡÷–∂œ–≈∫≈
-//     CTP_SDA       Ω”          PF11         //µÁ»›¥•√˛∆¡IIC ˝æ›–≈∫≈
-//     CTP_RST       Ω”          PC5          //µÁ»›¥•√˛∆¡∏¥Œª–≈∫≈
-//     CTP_SCL       Ω”          PB0          //µÁ»›¥•√˛∆¡IIC ±÷”–≈∫≈
-**************************************************************************************************/	
- /* @attention
-  *
-  * THE PRESENT FIRMWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
-  * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE
-  * TIME. AS A RESULT, QD electronic SHALL NOT BE HELD LIABLE FOR ANY
-  * DIRECT, INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING
-  * FROM THE CONTENT OF SUCH FIRMWARE AND/OR THE USE MADE BY CUSTOMERS OF THE
-  * CODING INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
-**************************************************************************************************/
+/*
+ * @Author: ÊòüÂøÖÂ∞òSguan
+ * @Date: 2025-04-27 21:49:22
+ * @LastEditors: ÊòüÂøÖÂ∞òSguan|3464647102@qq.com
+ * @LastEditTime: 2025-04-29 19:33:16
+ * @FilePath: \test_SPIscreen\Hardware\mySPI.c
+ * @Description: [Â∑≤ÂÆåÊàê]Á°¨‰ª∂SPIÂáΩÊï∞ÁöÑÁºñÂÜô
+ * 
+ * Copyright (c) 2025 by $JUST, All Rights Reserved. 
+ */
 #include "mySPI.h"
 
-extern SPI_HandleTypeDef hspi1;  // SPI1æ‰±˙
-
-/*****************************************************************************
- * @name       :u8 SPI_WriteByte(SPI_TypeDef* SPIx, u8 Byte)
- * @date       :2018-08-09 
- * @function   :Write a byte of data using STM32's hardware SPI
- * @parameters :SPIx: SPI¿‡–Õ( µº  π”√hspi1æ‰±˙)
-                Byte:“™–¥»Îµƒ ˝æ›
- * @retvalue   :◊‹œﬂΩ” ’µΩµƒ ˝æ›
-******************************************************************************/
-uint8_t SPI_WriteByte(SPI_HandleTypeDef* SPIx, uint8_t Byte)
+uint8_t SPI_WriteByte(SPI_TypeDef* SPIx,uint8_t Byte)
 {
-    uint8_t received = 0;
-    HAL_SPI_TransmitReceive(&hspi1, &Byte, &received, 1, HAL_MAX_DELAY);
-    return received;
+	uint8_t rx_data;
+    HAL_SPI_TransmitReceive(&hspi1, &Byte, &rx_data, 1, HAL_MAX_DELAY);
+    return rx_data;
 }
 
-/*****************************************************************************
- * @name       :void SPI_SetSpeed(SPI_TypeDef* SPIx, u8 SpeedSet)
- * @date       :2018-08-09 
- * @function   :…Ë÷√”≤º˛SPIÀŸ∂»
- * @parameters :SPIx: SPI¿‡–Õ( µº  π”√hspi1æ‰±˙)
-                SpeedSet:0-∏ﬂÀŸ
-                         1-µÕÀŸ
- * @retvalue   :None
-******************************************************************************/
-void SPI_SetSpeed(SPI_HandleTypeDef* SPIx, uint8_t SpeedSet)
+void SPI_SetSpeed(SPI_TypeDef* SPIx,uint8_t SpeedSet)
 {
-    hspi1.Instance->CR1 &= ~SPI_CR1_BR;  // «Â≥˝‘§∑÷∆µŒª
-    
-    if(SpeedSet == 1) // ∏ﬂÀŸ
-    {
-        hspi1.Instance->CR1 |= SPI_BAUDRATEPRESCALER_2;  // Fpclk/2
+	SPIx->CR1 &= ~SPI_CR1_BR;  // Ê∏ÖÈô§ÂéüÊúâÂàÜÈ¢ëËÆæÁΩÆ
+    if(SpeedSet == 1) {
+        SPIx->CR1 |= SPI_BAUDRATEPRESCALER_2;  // È´òÈÄüÊ®°Âºè
+    } else {
+        SPIx->CR1 |= SPI_BAUDRATEPRESCALER_16; // ‰ΩéÈÄüÊ®°Âºè
     }
-    else // µÕÀŸ
-    {
-        hspi1.Instance->CR1 |= SPI_BAUDRATEPRESCALER_16; // Fpclk/16
-    }
-    
-    __HAL_SPI_ENABLE(&hspi1);  //  πƒ‹SPI
+    SPIx->CR1 |= SPI_CR1_SPE;  // ÈáçÊñ∞‰ΩøËÉΩSPI
 }
 
-/*****************************************************************************
- * @name       :void SPI1_Init(void)    
- * @date       :2018-08-09 
- * @function   :≥ı ºªØSTM32”≤º˛SPI1
- * @parameters :None
- * @retvalue   :None
-******************************************************************************/
-void SPI1_Init(void)    
+void SPI1_Init(void)	
 {
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    
-    // 1.  πƒ‹ ±÷”
+	__HAL_RCC_SPI1_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
-    __HAL_RCC_SPI1_CLK_ENABLE();
-    
-    // 2. ≈‰÷√GPIO
-    // PB3(SCK), PB4(MISO), PB5(MOSI)
+
+    // GPIOÂàùÂßãÂåñÔºàCubeMXÁîüÊàêÔºâ
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
     GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-    
-    // 3. ≈‰÷√SPI
+
+    // SPIÂèÇÊï∞ÈÖçÁΩÆ
     hspi1.Instance = SPI1;
     hspi1.Init.Mode = SPI_MODE_MASTER;
     hspi1.Init.Direction = SPI_DIRECTION_2LINES;
@@ -129,15 +52,6 @@ void SPI1_Init(void)
     hspi1.Init.NSS = SPI_NSS_SOFT;
     hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
     hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-    hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-    hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
     hspi1.Init.CRCPolynomial = 7;
-    if (HAL_SPI_Init(&hspi1) != HAL_OK)
-    {
-        // ≥ı ºªØ¥ÌŒÛ¥¶¿Ì
-        while(1);
-    }
-    
-    // 4.  πƒ‹SPI
-    __HAL_SPI_ENABLE(&hspi1);
+    HAL_SPI_Init(&hspi1);
 }
