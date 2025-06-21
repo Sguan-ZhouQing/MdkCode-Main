@@ -1,7 +1,7 @@
 #ifndef __ESP_H
 #define __ESP_H
 
-#include "stm32g4xx_hal.h"
+#include "stm32f4xx_hal.h"
 #include <stdbool.h>
 #include <stdint.h>  // 确保包含此头文件以使用 uint32_t
 #include <string.h>
@@ -20,7 +20,8 @@ typedef enum
 } Esp_StatusTypeDef;
 
 
-Esp_StatusTypeDef Esp_Init(void);
+static void ESP_SendString(const char *Str);
+Esp_StatusTypeDef ESP_Init(void);
 
 
 #endif
