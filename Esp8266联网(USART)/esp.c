@@ -2,7 +2,7 @@
  * @Author: 星必尘Sguan
  * @Date: 2025-04-17 15:44:34
  * @LastEditors: 星必尘Sguan|3464647102@qq.com
- * @LastEditTime: 2025-06-08 20:32:26
+ * @LastEditTime: 2025-07-04 03:15:38
  * @FilePath: \demo_STM32F407code\Hardware\esp.c
  * @Description: 实现esp8266_01s连接OneNET物联网模型;
  * @Key_GPIO: PA2 -> USART2_TX; PA3 -> UASRT2_RX;
@@ -10,8 +10,13 @@
  * Copyright (c) 2025 by $JUST, All Rights Reserved. 
  */
 #include "esp.h"
+#include "cmsis_os.h"
+
 
 extern UART_HandleTypeDef huart2;
+extern uint8_t esp_readBuffer[esp_BUFFER_SIZE];
+extern uint16_t esp_rx_index;
+
 
 /**
  * @description: AT指令定义（已添加\r\n）
@@ -25,6 +30,7 @@ static const char *espSet_Token = "AT+MQTTUSERCFG=0,1,\"d1\",\"REc53ZzF42\",\"ve
 static const char *espSet_SeverStation = "AT+MQTTCONN=0,\"mqtts.heclouds.com\",1883,1\r\n";
 static const char *espReply_Topic = "AT+MQTTSUB=0,\"$sys/REc53ZzF42/d1/thing/property/post/reply\",1\r\n";
 static const char *espSet_Topic = "AT+MQTTSUB=0,\"$sys/REc53ZzF42/d1/thing/property/set\",0\r\n";
+// static char mqtt_pub_cmd[] = "AT+MQTTPUB=0,\"$sys/REc53ZzF42/d1/thing/property/post\",\"{\\\"id\\\":\\\"123\\\"\\,\\\"params\\\":{\\\"temp\\\":{\\\"value\\\":45}}}\",0,0";
 
 
 /**
@@ -38,37 +44,119 @@ static void ESP_SendString(const char *Str)
     // HAL_Delay(100);   //适当延时，确保模块的初始化工作正常进行
 }
 
-
 /**
  * @brief 初始化ESP8266并连接MQTT
  * @return Esp_OK: 成功, Esp_ERROR: 失败
  */
 Esp_StatusTypeDef ESP_Init(void) {
-    // HAL_GPIO_WritePin(Esp_EN_Port, Esp_EN, GPIO_PIN_SET);
-    // HAL_GPIO_WritePin(Esp_RST_Port, Esp_RST, GPIO_PIN_SET);
     // 依次发送AT指令并检查响应
-	  HAL_Delay(4000);
+    // HAL_Delay(4000);
+    osDelay(4000);
     ESP_SendString(esp_ATmain);
-    HAL_Delay(100);
+    // HAL_Delay(100);
+    osDelay(100);
     ESP_SendString(espSet_StationMode);
-    HAL_Delay(100);
+    // HAL_Delay(100);
+    osDelay(100);
     ESP_SendString(espStart_DHCP);
-    HAL_Delay(100);
+    // HAL_Delay(100);
+    osDelay(100);
     // ESP_SendString(espConnet_Wifi);
     // HAL_Delay(6000);
     ESP_SendString(espSet_Token);
-    HAL_Delay(200);
+    // HAL_Delay(200);
+    osDelay(200);
     ESP_SendString(espSet_SeverStation);
-    HAL_Delay(5000);
+    // HAL_Delay(5000);
+    osDelay(5000);
     ESP_SendString(espReply_Topic);
-    HAL_Delay(200);
+    // HAL_Delay(200);
+    osDelay(200);
     ESP_SendString(espSet_Topic);
-    return Esp_OK; // 检查所有指令是否均返回OK
+    //启用串口2的DMA传输，用于接收消息更新
+    HAL_StatusTypeDef temp = HAL_UARTEx_ReceiveToIdle_DMA(&huart2, esp_readBuffer, sizeof(esp_readBuffer));
+    __HAL_DMA_DISABLE_IT(huart2.hdmarx, DMA_IT_HT);
+    if (temp == HAL_OK){
+        return Esp_OK;
+    }
+    return Esp_ERROR; // 检查所有指令是否均返回OK
 }
 
+/**
+ * @description: 发送MQTT发布消息，动态替换变量和值
+ * @param {const char*} var_name 变量名（如"temp"、"humi"等）
+ * @param {float} value 变量的值
+ * @return {void}
+ */
+void ESP_SendMQTTVar(const char* var_name, float value) {
+    // 创建足够大的缓冲区
+    char buffer[256];
+    // 格式化MQTT发布命令
+    snprintf(buffer, sizeof(buffer), 
+             "AT+MQTTPUB=0,\"$sys/REc53ZzF42/d1/thing/property/post\","
+             "\"{\\\"id\\\":\\\"123\\\"\\,\\\"params\\\":{\\\"%s\\\":{\\\"value\\\":%.2f}}}\",0,0\r\n",
+             var_name, value);
+    // 发送命令
+    ESP_SendString(buffer);
+}
 
+/**
+ * @description: 发送MQTT发布消息，针对布尔型变量
+ * @param {const char*} var_name 变量名（如"power_flag"、"motor_flag"）
+ * @param {bool} value 布尔值
+ * @return {void}
+ */
+void ESP_SendMQTTBool(const char* var_name, bool value) {
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), 
+             "AT+MQTTPUB=0,\"$sys/REc53ZzF42/d1/thing/property/post\","
+             "\"{\\\"id\\\":\\\"123\\\"\\,\\\"params\\\":{\\\"%s\\\":{\\\"value\\\":%s}}}\",0,0\r\n",
+             var_name, value ? "true" : "false");
+    ESP_SendString(buffer);
+}
 
+/**
+ * @description: 发送MQTT发布消息，针对整型变量
+ * @param {const char*} var_name 变量名（如"command"、"device_ID"）
+ * @param {int} value 整数值
+ * @return {void}
+ */
+void ESP_SendMQTTInt(const char* var_name, int value) {
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), 
+             "AT+MQTTPUB=0,\"$sys/REc53ZzF42/d1/thing/property/post\","
+             "\"{\\\"id\\\":\\\"123\\\"\\,\\\"params\\\":{\\\"%s\\\":{\\\"value\\\":%d}}}\",0,0\r\n",
+             var_name, value);
+    ESP_SendString(buffer);
+}
 
+/**
+ * @description: 发送MQTT发布消息，针对数组变量
+ * @param {const char*} var_name 数组变量名（如"warehouse_left"、"warehouse_right"）
+ * @param {uint8_t*} array 数组指针
+ * @param {int} size 数组大小
+ * @return {void}
+ */
+void ESP_SendMQTTArray(const char* var_name, uint8_t* array, int size) {
+    char buffer[512];
+    char array_str[128] = "[";
+    // 构建数组字符串
+    for (int i = 0; i < size; i++) {
+        char temp[8];
+        snprintf(temp, sizeof(temp), "%d", array[i]);
+        strcat(array_str, temp);
+        if (i < size - 1) {
+            strcat(array_str, ",");
+        }
+    }
+    strcat(array_str, "]");
+    // 格式化完整的MQTT命令
+    snprintf(buffer, sizeof(buffer), 
+             "AT+MQTTPUB=0,\"$sys/REc53ZzF42/d1/thing/property/post\","
+             "\"{\\\"id\\\":\\\"123\\\"\\,\\\"params\\\":{\\\"%s\\\":{\\\"value\\\":%s}}}\",0,0\r\n",
+             var_name, array_str);
+    ESP_SendString(buffer);
+}
 
 
 
