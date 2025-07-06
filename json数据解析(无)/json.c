@@ -2,7 +2,7 @@
  * @Author: 星必尘Sguan
  * @Date: 2025-05-26 15:32:04
  * @LastEditors: 星必尘Sguan|3464647102@qq.com
- * @LastEditTime: 2025-07-04 03:23:39
+ * @LastEditTime: 2025-07-06 21:37:25
  * @FilePath: \demo_STM32F407code\Hardware\json.c
  * @Description: 实现json数据的接收和解析
  * @Key_GPIO: NULL;
@@ -10,7 +10,7 @@
  * Copyright (c) 2025 by $JUST, All Rights Reserved. 
  */
 #include "json.h"
-#include "Buzzer.h"
+#include "gpio.h"
 
 extern UART_HandleTypeDef huart2;
 extern uint8_t esp_readBuffer[esp_BUFFER_SIZE];
@@ -19,15 +19,19 @@ extern volatile bool rx_complete;
 // 全局变量定义
 float temp = 0.0f;                 // AHT20传感器上传的温度（展示用）
 float humi = 0.0f;                 // AGT20上传的湿度数据（展示用）
-float stress = 0.0f;               // 压力传感器数值（展示用）
+float strees = 0.0f;               // 压力传感器数值（展示用）
 float distance = 0.0f;             // 距离传感器，测人与药仓的距离（展示用）
 bool power_flag = true;            // 电控板的电源开关（控制）
 bool motor_flag = true;            // 电机强制归零开关（控制）
-uint32_t timer = 0;                // 单片机获取的时间戳
-uint8_t warehouse_left[6] = {0};   // 药仓占用情况左部分（控制）
-uint8_t warehouse_right[6] = {0};  // 药仓占用情况右部分（控制）
+uint32_t timer = 1751629025;       // 单片机获取的时间戳
 uint8_t command = 0;               // 存取药的命令0-24（控制）
 uint8_t device_ID = 0;             // 用户身份核验
+//药仓占用情况全局变量
+uint8_t yaocang_2 = 0;
+uint8_t yaocang_4 = 0;
+uint8_t yaocang_7 = 0;
+uint8_t yaocang_9 = 0;
+
 
 /**
  * @description: 解析MQTT消息，提取JSON部分
@@ -44,111 +48,126 @@ void parse_mqtt_message(const char *message) {
     parse_json_data(json_start);
 }
 
+
 /**
- * @description: 解析JSON数据并更新全局变量
- * @param {char} *json_str JSON字符串
- * @return {void}
+ * @brief 解析JSON数据并更新全局变量
+ * @param message 原始MQTT消息字符串
  */
-void parse_json_data(const char *json_str) {
-    // 解析JSON
-    cJSON *root = cJSON_Parse(json_str);
-    if (root == NULL) {
-        const char *error_ptr = cJSON_GetErrorPtr();
-        if (error_ptr != NULL) {
-            // printf("JSON parse error before: %s\n", error_ptr);
-            Buzzer_Control();
-        }
+void parse_json_data(const char *message) {
+    // 跳过前缀找到JSON起始位置
+    const char *json_start = strchr(message, '{');
+    if (!json_start) {
         return;
     }
-    // 获取params对象
-    cJSON *params = cJSON_GetObjectItemCaseSensitive(root, "params");
-    if (params == NULL) {
-        cJSON_Delete(root);
+
+    // 创建可修改的副本
+    size_t json_len = strlen(json_start);
+    char *json_copy = (char *)malloc(json_len + 1);
+    if (!json_copy) {
         return;
+    }
+    strncpy(json_copy, json_start, json_len);
+    json_copy[json_len] = '\0';
+
+    // 确保JSON完整闭合
+    char *json_end = strrchr(json_copy, '}');
+    if (!json_end) {
+        free(json_copy);
+        return;
+    }
+    *(json_end + 1) = '\0'; // 强制终止
+
+    // 解析JSON
+    cJSON *root = cJSON_Parse(json_copy);
+    if (!root) {
+        free(json_copy);
+        return;
+    }
+
+    // 提取params对象
+    cJSON *params = cJSON_GetObjectItemCaseSensitive(root, "params");
+    if (!params) {
+        cJSON_Delete(root);
+        free(json_copy);
+        return;
+    }
+
+    // 解析command
+    cJSON *cmd_item = cJSON_GetObjectItemCaseSensitive(params, "command");
+    if (cJSON_IsNumber(cmd_item)) {
+        command = (uint8_t)cmd_item->valueint;
+    }
+
+    // 解析yaocang_x字段（同时只会出现其中一个）
+    cJSON *yaocang_item = NULL;
+    
+    yaocang_item = cJSON_GetObjectItemCaseSensitive(params, "yaocang_2");
+    if (cJSON_IsNumber(yaocang_item)) {
+        yaocang_2 = (uint8_t)yaocang_item->valueint;
+        ESP_SendMQTTInt("yaocang_2", yaocang_2);
     }
     
-    // 解析各个字段
-    cJSON *item = NULL;
-    // 解析command
-    item = cJSON_GetObjectItemCaseSensitive(params, "command");
-    if (cJSON_IsNumber(item)) {
-        command = (uint8_t)item->valueint;
+    yaocang_item = cJSON_GetObjectItemCaseSensitive(params, "yaocang_4");
+    if (cJSON_IsNumber(yaocang_item)) {
+        yaocang_4 = (uint8_t)yaocang_item->valueint;
+        ESP_SendMQTTInt("yaocang_4", yaocang_4);
     }
-    // 解析power_flag
+    
+    yaocang_item = cJSON_GetObjectItemCaseSensitive(params, "yaocang_7");
+    if (cJSON_IsNumber(yaocang_item)) {
+        yaocang_7 = (uint8_t)yaocang_item->valueint;
+        ESP_SendMQTTInt("yaocang_7", yaocang_7);
+    }
+    
+    yaocang_item = cJSON_GetObjectItemCaseSensitive(params, "yaocang_9");
+    if (cJSON_IsNumber(yaocang_item)) {
+        yaocang_9 = (uint8_t)yaocang_item->valueint;
+        ESP_SendMQTTInt("yaocang_9", yaocang_9);
+    }
+
+    // 解析其他字段
+    cJSON *item = NULL;
+    
+    // 时间戳（13位转10位）
+    item = cJSON_GetObjectItemCaseSensitive(params, "timer");
+    if (cJSON_IsNumber(item)) {
+        char timer_str[14];
+        snprintf(timer_str, sizeof(timer_str), "%.0f", item->valuedouble);
+        if (strlen(timer_str) > 10) timer_str[10] = '\0';
+        timer = (uint32_t)strtoul(timer_str, NULL, 10);
+        ESP_SendMQTTInt("timer", timer);
+    }
+
+    // 布尔值
     item = cJSON_GetObjectItemCaseSensitive(params, "power_flag");
     if (cJSON_IsBool(item)) {
         power_flag = cJSON_IsTrue(item);
+        ESP_SendMQTTBool("power_flag", power_flag);
     }
-    // 解析motor_flag
+
     item = cJSON_GetObjectItemCaseSensitive(params, "motor_flag");
     if (cJSON_IsBool(item)) {
         motor_flag = cJSON_IsTrue(item);
+        ESP_SendMQTTBool("motor_flag", motor_flag);
     }
-    // 解析timer
-    item = cJSON_GetObjectItemCaseSensitive(params, "timer");
-    if (cJSON_IsNumber(item)) {
-        timer = (uint32_t)item->valuedouble;
-    }
-    // 解析device_ID
+
+    // 设备ID（暂时用不到）
     item = cJSON_GetObjectItemCaseSensitive(params, "device_ID");
-    if (cJSON_IsNumber(item)) {
-        device_ID = (uint8_t)item->valueint;
-    }
-    // 解析warehouse_left数组
-    item = cJSON_GetObjectItemCaseSensitive(params, "warehouse_left");
-    if (cJSON_IsArray(item)) {
-        update_warehouse_left(item);
-    }
-    // 解析warehouse_right数组
-    item = cJSON_GetObjectItemCaseSensitive(params, "warehouse_right");
-    if (cJSON_IsArray(item)) {
-        update_warehouse_right(item);
-    }
-    
-    // 释放JSON对象
+    if (cJSON_IsNumber(item)) device_ID = (uint8_t)item->valueint;
+
+    // 释放资源
     cJSON_Delete(root);
+    free(json_copy);
 }
 
-/**
- * @description: 更新warehouse_left数组
- * @param {cJSON} *array JSON数组对象
- * @return {void}
- */
-void update_warehouse_left(cJSON *array) {
-    int size = cJSON_GetArraySize(array);
-    size = (size > 6) ? 6 : size; // 确保不超过数组大小
-    
-    for (int i = 0; i < size; i++) {
-        cJSON *item = cJSON_GetArrayItem(array, i);
-        if (cJSON_IsNumber(item)) {
-            warehouse_left[i] = (uint8_t)item->valueint;
-        }
-    }
-}
-
-/**
- * @description: 更新warehouse_right数组
- * @param {cJSON} *array JSON数组对象
- * @return {void}
- */
-void update_warehouse_right(cJSON *array) {
-    int size = cJSON_GetArraySize(array);
-    size = (size > 6) ? 6 : size; // 确保不超过数组大小
-    
-    for (int i = 0; i < size; i++) {
-        cJSON *item = cJSON_GetArrayItem(array, i);
-        if (cJSON_IsNumber(item)) {
-            warehouse_right[i] = (uint8_t)item->valueint;
-        }
-    }
-}
 
 
 // 在主循环中处理
-void Json_ProcessData_tick(void) {
-    if (rx_complete) {
+void json_ProcessData_Tick(void) {
+    if (rx_complete == true) {
         // 查找JSON起始位置（跳过"+MQTTSUBRECV..."前缀）
         char *json_start = strchr((char*)esp_readBuffer, '{');
+        // OLED_ShowAsciiBuffer(0, 0, esp_readBuffer, esp_BUFFER_SIZE, OLED_6X8);
         if (json_start) {
             parse_json_data(json_start);
         }
