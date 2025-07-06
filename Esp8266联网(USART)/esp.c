@@ -2,7 +2,7 @@
  * @Author: 星必尘Sguan
  * @Date: 2025-04-17 15:44:34
  * @LastEditors: 星必尘Sguan|3464647102@qq.com
- * @LastEditTime: 2025-07-04 03:15:38
+ * @LastEditTime: 2025-07-06 21:27:19
  * @FilePath: \demo_STM32F407code\Hardware\esp.c
  * @Description: 实现esp8266_01s连接OneNET物联网模型;
  * @Key_GPIO: PA2 -> USART2_TX; PA3 -> UASRT2_RX;
@@ -10,7 +10,6 @@
  * Copyright (c) 2025 by $JUST, All Rights Reserved. 
  */
 #include "esp.h"
-#include "cmsis_os.h"
 
 
 extern UART_HandleTypeDef huart2;
@@ -50,28 +49,21 @@ static void ESP_SendString(const char *Str)
  */
 Esp_StatusTypeDef ESP_Init(void) {
     // 依次发送AT指令并检查响应
-    // HAL_Delay(4000);
-    osDelay(4000);
+    HAL_Delay(600);
     ESP_SendString(esp_ATmain);
-    // HAL_Delay(100);
-    osDelay(100);
+    HAL_Delay(600);
     ESP_SendString(espSet_StationMode);
-    // HAL_Delay(100);
-    osDelay(100);
+    HAL_Delay(600);
     ESP_SendString(espStart_DHCP);
-    // HAL_Delay(100);
-    osDelay(100);
+    HAL_Delay(600);
     // ESP_SendString(espConnet_Wifi);
     // HAL_Delay(6000);
     ESP_SendString(espSet_Token);
-    // HAL_Delay(200);
-    osDelay(200);
+    HAL_Delay(1800);
     ESP_SendString(espSet_SeverStation);
-    // HAL_Delay(5000);
-    osDelay(5000);
+    HAL_Delay(8000);
     ESP_SendString(espReply_Topic);
-    // HAL_Delay(200);
-    osDelay(200);
+    HAL_Delay(800);
     ESP_SendString(espSet_Topic);
     //启用串口2的DMA传输，用于接收消息更新
     HAL_StatusTypeDef temp = HAL_UARTEx_ReceiveToIdle_DMA(&huart2, esp_readBuffer, sizeof(esp_readBuffer));
@@ -131,8 +123,8 @@ void ESP_SendMQTTInt(const char* var_name, int value) {
 }
 
 /**
- * @description: 发送MQTT发布消息，针对数组变量
- * @param {const char*} var_name 数组变量名（如"warehouse_left"、"warehouse_right"）
+ * @description: 发送数组数据到 OneNET（适配官方要求的 JSON 格式）
+ * @param {const char*} var_name 变量名（如 "warehouse_left"）
  * @param {uint8_t*} array 数组指针
  * @param {int} size 数组大小
  * @return {void}
@@ -140,21 +132,25 @@ void ESP_SendMQTTInt(const char* var_name, int value) {
 void ESP_SendMQTTArray(const char* var_name, uint8_t* array, int size) {
     char buffer[512];
     char array_str[128] = "[";
-    // 构建数组字符串
+
+    // 1. 构建数组字符串（如 "[1,0,1,0,1,0]"）
     for (int i = 0; i < size; i++) {
         char temp[8];
         snprintf(temp, sizeof(temp), "%d", array[i]);
         strcat(array_str, temp);
-        if (i < size - 1) {
-            strcat(array_str, ",");
-        }
+        if (i < size - 1) strcat(array_str, ",");
     }
     strcat(array_str, "]");
-    // 格式化完整的MQTT命令
+
+    // 2. 生成完整的 JSON（包含 "value" 和 "version"）
     snprintf(buffer, sizeof(buffer), 
              "AT+MQTTPUB=0,\"$sys/REc53ZzF42/d1/thing/property/post\","
              "\"{\\\"id\\\":\\\"123\\\"\\,\\\"params\\\":{\\\"%s\\\":{\\\"value\\\":%s}}}\",0,0\r\n",
-             var_name, array_str);
+             var_name, array_str);  // 也可使用时间戳作为动态 id
+
+    // // 3. 调试输出（可选）
+    // printf("[OneNET] Sending: %s\n", buffer);
+    // 4. 发送数据
     ESP_SendString(buffer);
 }
 
