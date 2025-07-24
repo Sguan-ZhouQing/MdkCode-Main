@@ -2,7 +2,7 @@
  * @Author: 星必尘Sguan
  * @Date: 2025-05-26 15:32:04
  * @LastEditors: 星必尘Sguan|3464647102@qq.com
- * @LastEditTime: 2025-07-06 21:37:25
+ * @LastEditTime: 2025-07-09 23:26:41
  * @FilePath: \demo_STM32F407code\Hardware\json.c
  * @Description: 实现json数据的接收和解析
  * @Key_GPIO: NULL;
@@ -11,16 +11,20 @@
  */
 #include "json.h"
 #include "gpio.h"
+#include "esp.h"
+#include "RTC_Timer.h"
+#include "cmsis_os.h"
 
 extern UART_HandleTypeDef huart2;
 extern uint8_t esp_readBuffer[esp_BUFFER_SIZE];
 extern volatile bool rx_complete;
+#define MAX_JSON_LEN 512  // 根据实际JSON最大长度调整
 
 // 全局变量定义
 float temp = 0.0f;                 // AHT20传感器上传的温度（展示用）
 float humi = 0.0f;                 // AGT20上传的湿度数据（展示用）
 float strees = 0.0f;               // 压力传感器数值（展示用）
-float distance = 0.0f;             // 距离传感器，测人与药仓的距离（展示用）
+float my_distance = 0.0f;             // 距离传感器，测人与药仓的距离（展示用）
 bool power_flag = true;            // 电控板的电源开关（控制）
 bool motor_flag = true;            // 电机强制归零开关（控制）
 uint32_t timer = 1751629025;       // 单片机获取的时间戳
@@ -60,27 +64,29 @@ void parse_json_data(const char *message) {
         return;
     }
 
-    // 创建可修改的副本
+    // 使用静态缓冲区
+    static char json_buffer[MAX_JSON_LEN + 1];
     size_t json_len = strlen(json_start);
-    char *json_copy = (char *)malloc(json_len + 1);
-    if (!json_copy) {
-        return;
+    
+    // 检查长度是否超过缓冲区
+    if (json_len > MAX_JSON_LEN) {
+        json_len = MAX_JSON_LEN;
     }
-    strncpy(json_copy, json_start, json_len);
-    json_copy[json_len] = '\0';
+    
+    // 复制JSON数据
+    strncpy(json_buffer, json_start, json_len);
+    json_buffer[json_len] = '\0';
 
     // 确保JSON完整闭合
-    char *json_end = strrchr(json_copy, '}');
+    char *json_end = strrchr(json_buffer, '}');
     if (!json_end) {
-        free(json_copy);
         return;
     }
     *(json_end + 1) = '\0'; // 强制终止
 
     // 解析JSON
-    cJSON *root = cJSON_Parse(json_copy);
+    cJSON *root = cJSON_Parse(json_buffer);
     if (!root) {
-        free(json_copy);
         return;
     }
 
@@ -88,7 +94,6 @@ void parse_json_data(const char *message) {
     cJSON *params = cJSON_GetObjectItemCaseSensitive(root, "params");
     if (!params) {
         cJSON_Delete(root);
-        free(json_copy);
         return;
     }
 
@@ -135,7 +140,10 @@ void parse_json_data(const char *message) {
         snprintf(timer_str, sizeof(timer_str), "%.0f", item->valuedouble);
         if (strlen(timer_str) > 10) timer_str[10] = '\0';
         timer = (uint32_t)strtoul(timer_str, NULL, 10);
+        //返回参数到云平台
         ESP_SendMQTTInt("timer", timer);
+        //及时更新现在的时间
+        RTC_TimerUpdate();
     }
 
     // 布尔值
@@ -157,13 +165,11 @@ void parse_json_data(const char *message) {
 
     // 释放资源
     cJSON_Delete(root);
-    free(json_copy);
 }
 
 
-
 // 在主循环中处理
-void json_ProcessData_Tick(void) {
+void Json_ProcessData_Tick(void) {
     if (rx_complete == true) {
         // 查找JSON起始位置（跳过"+MQTTSUBRECV..."前缀）
         char *json_start = strchr((char*)esp_readBuffer, '{');

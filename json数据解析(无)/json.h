@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include "cJSON.h"
-#include "esp.h"
 
 // 全局变量声明
 extern float temp;
@@ -30,7 +29,7 @@ extern uint8_t yaocang_9;
 // 函数声明
 void parse_mqtt_message(const char *message);
 void parse_json_data(const char *message) ;
-void json_ProcessData_Tick(void);
+void Json_ProcessData_Tick(void);
 
 
 
