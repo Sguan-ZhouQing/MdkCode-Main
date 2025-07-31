@@ -3,7 +3,10 @@
 
 #include "stm32f4xx_hal.h"
 
+#define esp_BUFFER_SIZE 256
+
+void UART_SendFloats(float *data, uint8_t count, uint8_t decimal_places);
 
 
-#endif 
+#endif // PRINTF_H
 
